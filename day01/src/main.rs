@@ -18,35 +18,21 @@ fn main() -> std::io::Result<()> {
         .lines()
         .map(|x| x.parse::<usize>().expect("Could not parse value."))
         .collect();
-    println!("Part1: {:?}", count_depth_increases(&input));
-    println!("Part2: {:?}", count_depth_increases_sliding(&input));
+    println!("Part1: {:?}", count_depth_increases(&input, 1));
+    println!("Part2: {:?}", count_depth_increases(&input, 3));
 
     Ok(())
 }
 
-fn count_depth_increases(measurements: &Vec<usize>) -> usize {
-    let mut a = usize::MAX;
-    let mut b: usize;
-    let mut count = 0;
-    for i in 0..measurements.len() {
-        b = measurements[i];
-        if b > a {
-            count = count + 1;
-        }
-        a = b;
-    }
-    count
-}
-
-fn count_depth_increases_sliding(measurements: &Vec<usize>) -> usize {
+fn count_depth_increases(measurements: &Vec<usize>, window_size: usize) -> usize {
     let mut count = 0;
 
     let mut window_a: &[usize];
     let mut window_b: &[usize];
 
-    for i in 0..measurements.len() - 3 {
-        window_a = &measurements[i..i + 3];
-        window_b = &measurements[i + 1..i + 4];
+    for i in 0..measurements.len() - window_size {
+        window_a = &measurements[i..i + window_size];
+        window_b = &measurements[i + 1..i + 1 + window_size];
 
         let sum_a: usize = window_a.iter().sum();
         let sum_b: usize = window_b.iter().sum();
@@ -64,12 +50,12 @@ mod tests {
     #[test]
     fn example_pt1() {
         let input = vec![199, 200, 208, 210, 200, 207, 240, 269, 260, 263];
-        assert_eq!(count_depth_increases(&input), 7);
+        assert_eq!(count_depth_increases(&input, 1), 7);
     }
 
     #[test]
     fn example_pt2() {
         let input = vec![199, 200, 208, 210, 200, 207, 240, 269, 260, 263];
-        assert_eq!(count_depth_increases_sliding(&input), 5);
+        assert_eq!(count_depth_increases(&input, 3), 5);
     }
 }
