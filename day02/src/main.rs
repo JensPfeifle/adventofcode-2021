@@ -15,10 +15,17 @@ where
 
 fn main() -> std::io::Result<()> {
     let contents = read("2.in").expect("Could not read input file.");
-    let mut sub = Submarine { x: 0, y: 0 };
     let instructions = parse_instructions(&contents);
-    sub.interpret(&instructions);
-    println!("{:?}", sub.x * sub.y);
+    {
+        let mut sub = Submarine { x: 0, y: 0, aim: 0 };
+        sub.interpret(&instructions);
+        println!("part1: {:?}", sub.x * sub.y);
+    }
+    {
+        let mut sub = Submarine { x: 0, y: 0, aim: 0 };
+        sub.interpret_pt2(&instructions);
+        println!("part2: {:?}", sub.x * sub.y);
+    }
 
     Ok(())
 }
@@ -26,6 +33,7 @@ fn main() -> std::io::Result<()> {
 struct Submarine {
     x: u32,
     y: u32,
+    aim: u32,
 }
 
 enum Instruction {
@@ -41,6 +49,19 @@ impl Submarine {
                 Instruction::Down(unit) => self.y = self.y + unit,
                 Instruction::Up(unit) => self.y = self.y - unit,
                 Instruction::Forward(unit) => self.x = self.x + unit,
+            }
+        }
+    }
+
+    fn interpret_pt2(&mut self, instructions: &Vec<Instruction>) {
+        for instruction in instructions {
+            match instruction {
+                Instruction::Down(unit) => self.aim = self.aim + unit,
+                Instruction::Up(unit) => self.aim = self.aim - unit,
+                Instruction::Forward(units) => {
+                    self.x = self.x + units;
+                    self.y = self.y + (self.aim * units);
+                }
             };
         }
     }
@@ -76,7 +97,7 @@ mod tests {
                      down 8\n\
                      forward 2";
 
-        let mut sub = Submarine { x: 0, y: 0 };
+        let mut sub = Submarine { x: 0, y: 0, aim: 0 };
 
         let instructions: Vec<Instruction> = parse_instructions(&input);
         sub.interpret(&instructions);
@@ -91,5 +112,11 @@ mod tests {
                      up 3\n\
                      down 8\n\
                      forward 2";
+
+        let mut sub = Submarine { x: 0, y: 0, aim: 0 };
+
+        let instructions: Vec<Instruction> = parse_instructions(&input);
+        sub.interpret_pt2(&instructions);
+        assert_eq!(sub.x * sub.y, 900);
     }
 }
