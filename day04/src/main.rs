@@ -16,7 +16,8 @@ where
 
 struct BingoGame {
     numbers: Vec<u8>,
-    current_number: usize,
+    scores: Vec<u32>,
+    winners: Vec<usize>,
     boards: Array<u8, Ix3>,
     marks: Array<u8, Ix3>,
 }
@@ -25,92 +26,69 @@ impl BingoGame {
     fn new(input: &str) -> Self {
         let boards = parse_boards(&input);
         let marks = Array::<u8, _>::zeros(boards.raw_dim());
+        let num_boards = boards.dim().0;
         BingoGame {
             numbers: parse_numbers(&input),
-            current_number: 0,
+            scores: vec![0; num_boards],
             boards,
             marks,
-        }
-    }
-    /// Play game until a winner is found.
-    fn play(&mut self) -> u32 {
-        loop {
-            let result = self.next_round();
-            if let Some(winner) = result {
-                println!("Winner is {:?}!", winner);
-                let score = self.calculate_score(winner);
-                println!("Score is {:?}!", score);
-                return score;
-            }
+            winners: vec![],
         }
     }
 
-    /// Returns Some(winning board index).
-    fn next_round(&mut self) -> Option<usize> {
-        println!("Round {:?}!", self.current_number);
-        let number = self.numbers[self.current_number];
-        println!("We've got a {:?}", number);
-        let matches = self.boards.map(|&field| field == number);
-        println!("{:?}", self.boards.slice(s![0, .., ..]));
-        println!("{:?}", matches.slice(s![0, .., ..]));
-        self.marks.zip_mut_with(&matches, |marked, &matched| {
-            *marked = if *marked == 1 || matched { 1u8 } else { 0u8 };
-        });
-        if let Some(winner) = self.check_for_winners() {
-            return Some(winner);
-        };
-        self.current_number += 1;
-        None
-    }
-
-    fn calculate_score(&self, board_idx: usize) -> u32 {
-        let board = self.boards.slice(s![board_idx, .., ..]);
-        let marks = self.marks.slice(s![board_idx, .., ..]);
-        println!("board: {:?}", board);
-        println!("marks: {:?}", marks);
-        let board: Vec<&u8> = board.iter().collect();
-        let marks: Vec<&u8> = marks.iter().collect();
-        println!("board: {:?}", board);
-        println!("marks: {:?}", marks);
-        // sum unmarked fields of board, multiply by most recent number called
-        let sum_unmarked: u32 = board
-            .iter()
-            .zip(marks)
-            .filter(|(_, &marked)| marked == 0)
-            .map(|(&value, _)| *value as u32)
-            .sum();
-        println!("sum: {:?}", sum_unmarked);
-        println!("number: {:?}", self.numbers[self.current_number]);
-        sum_unmarked * self.numbers[self.current_number] as u32
-    }
-
-    /// Checks if any boards have won, return the board index.
-    fn check_for_winners(&self) -> Option<usize> {
-        for (idx, marks) in self.marks.axis_iter(Axis(0)).enumerate() {
-            println!("marks: {:?}", marks);
-            for row in marks.rows() {
-                println!("r: {:?}", row);
-                if row.sum() == 5 {
-                    return Some(idx);
+    /// Play game.
+    fn play(&mut self) {
+        for number in self.numbers.iter_mut() {
+            let matches = self.boards.map(|field| field == number);
+            self.marks.zip_mut_with(&matches, |marked, &matched| {
+                *marked = if *marked == 1 || matched { 1u8 } else { 0u8 };
+            });
+            let mut round_winners = vec![];
+            for (idx, marks) in self.marks.axis_iter(Axis(0)).enumerate() {
+                if self.winners.contains(&idx) {
+                    // board has already won, don't check again
+                    continue;
+                }
+                for row in marks.rows() {
+                    if row.sum() == 5 {
+                        round_winners.push(idx);
+                    }
+                }
+                for col in marks.columns() {
+                    if col.sum() == 5 {
+                        round_winners.push(idx);
+                    }
                 }
             }
-            for col in marks.columns() {
-                println!("r: {:?}", col);
-                if col.sum() == 5 {
-                    return Some(idx);
-                }
+            for board_idx in round_winners {
+                let board = self.boards.slice(s![board_idx, .., ..]);
+                let marks = self.marks.slice(s![board_idx, .., ..]);
+                // sum unmarked fields of board
+                let sum_unmarked: u32 = board
+                    .iter()
+                    .zip(&marks)
+                    .filter(|(_, &marked)| marked == 0)
+                    .map(|(&value, _)| value as u32)
+                    .sum();
+                // multiply by previously called number
+                let score = sum_unmarked * *number as u32;
+                self.scores[board_idx] = score;
+                self.winners.push(board_idx);
             }
         }
-
-        None
     }
 }
 
 fn main() -> std::io::Result<()> {
     let input = read("4.in").expect("Could not read input file.");
     let mut game = BingoGame::new(&input);
-    let score = game.play();
-    println!("Score is {:?}!", score);
+
+    game.play();
+    let &winner = game.winners.iter().nth(0).expect("No winners!");
+    println!("Part1: Score of first winner is {:?}!", game.scores[winner]);
+    let &winner = game.winners.iter().last().expect("No winners!");
+    println!("Part2: Score of last winner is {:?}!", game.scores[winner]);
+
     Ok(())
 }
 
@@ -138,7 +116,6 @@ fn parse_boards(input: &str) -> Array<u8, Ix3> {
     }
     boards
 }
-//fn parse_boards(input: &str) ->  ()
 
 #[cfg(test)]
 mod tests {
@@ -148,12 +125,22 @@ mod tests {
     #[test]
     fn example_pt1() {
         let input = read("example.in").expect("Could not read example.in");
-
-        println!("{:?}", parse_numbers(&input));
-        println!("{:?}", parse_boards(&input));
         let mut game = BingoGame::new(&input);
-        let score = game.play();
-        println!("Score is {:?}!", score);
+        game.play();
+        println!("{:?}", game.winners);
+        println!("{:?}", game.scores);
+        let &winner = game.winners.iter().nth(0).expect("No winners!");
+        let score = game.scores[winner];
         assert_eq!(score, 4512);
+    }
+
+    #[test]
+    fn example_pt2() {
+        let input = read("example.in").expect("Could not read example.in");
+        let mut game = BingoGame::new(&input);
+        game.play();
+        let &winner = game.winners.iter().last().expect("No winners!");
+        let score = game.scores[winner];
+        assert_eq!(score, 1924);
     }
 }
